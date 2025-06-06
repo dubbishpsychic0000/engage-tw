@@ -3,7 +3,7 @@ name: Twitter Bot Runner - Every 30 Minutes
 on:
   schedule:
     # Run every 30 minutes
-    - cron: '*/30 * * * *'
+    - cron: '*0 * * * *'
   
   # Allow manual triggering
   workflow_dispatch:
