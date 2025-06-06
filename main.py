@@ -98,9 +98,11 @@ class PersistentScheduler:
             self.state["last_tweet_times"] = []
             self.state["last_reset_date"] = current_date
             self.state["daily_engagement_count"] = 0
-            self.state["daily_reply_count"] = 0  # Réinitialiser le compteur quotidien de réponses
-            self.state["daily_quote_count"] = 0  # Réinitialiser le compteur quotidien de citations
-            self.state["daily_thread_count"] = 0  # Reset thread count
+            self.state["daily_reply_count"] = 0
+            self.state["daily_quote_count"] = 0
+            self.state["daily_thread_count"] = 0
+            self.state["last_thread_time"] = None
+            self._save_state()
             logger.info("Reset quotidien effectué")
 
         # Limit of 2 threads per day
@@ -127,7 +129,7 @@ class PersistentScheduler:
         return True
 
     def should_engage(self) -> bool:
-        """Détermine s'il faut faire de l'engagement - maintenant aléatoire 24/7"""
+        """Détermine s'il faut faire de l'engagement avec limites strictes"""
         current_time = self._get_current_utc_time()
         current_date = current_time.date().isoformat()
 
@@ -138,11 +140,15 @@ class PersistentScheduler:
             self.state["last_engagement_times"] = []
             self.state["daily_reply_count"] = 0
             self.state["daily_quote_count"] = 0
+            self._save_state()
             logger.info("Reset quotidien de l'engagement effectué")
 
-        # Limite de 25 engagements par jour (augmentée pour 24/7)
-        if self.state["daily_engagement_count"] >= 25:
-            logger.info("Limite quotidienne d'engagement atteinte (25/25)")
+        # Limites strictes par jour
+        daily_reply_count = self.state.get("daily_reply_count", 0)
+        daily_quote_count = self.state.get("daily_quote_count", 0)
+        
+        if daily_reply_count >= 20 and daily_quote_count >= 5:
+            logger.info(f"Limites quotidiennes d'engagement atteintes - Replies: {daily_reply_count}/20, Quotes: {daily_quote_count}/5")
             return False
 
         # Vérifier l'espacement minimum (30 minutes entre les engagements)
@@ -152,7 +158,8 @@ class PersistentScheduler:
                 if not last_engagement.tzinfo:
                     last_engagement = last_engagement.replace(tzinfo=timezone.utc)
                 if current_time - last_engagement < timedelta(minutes=30):
-                    logger.debug("Espacement minimum non respecté entre les engagements")
+                    remaining_minutes = (timedelta(minutes=30) - (current_time - last_engagement)).total_seconds() / 60
+                    logger.info(f"Espacement minimum non respecté entre les engagements (encore {remaining_minutes:.1f} minutes à attendre)")
                     return False
             except Exception as e:
                 logger.warning(f"Erreur lors de la vérification du dernier engagement: {e}")
@@ -205,12 +212,12 @@ class AdvancedTwitterBot:
     def __init__(self):
         self.scheduler = PersistentScheduler()
 
-    async def execute_random_delay(self, min_minutes: int = 2, max_minutes: int = 15):
+    async def execute_random_delay(self, min_minutes: int = 5, max_minutes: int = 30):
         """Ajoute un délai aléatoire pour simuler un comportement humain"""
         # For new accounts, use longer delays
         if hasattr(self, 'is_new_account') and getattr(self, 'is_new_account', True):
-            min_minutes = max(min_minutes, 10)  # Minimum 15 minutes for new accounts
-            max_minutes = max(max_minutes, 20)  # Up to 1 hour for new accounts
+            min_minutes = max(min_minutes, 15)  # Minimum 15 minutes for new accounts
+            max_minutes = max(max_minutes, 60)  # Up to 1 hour for new accounts
             
         delay_minutes = random.uniform(min_minutes, max_minutes)
         delay_seconds = delay_minutes * 60
@@ -309,7 +316,7 @@ class AdvancedTwitterBot:
                 return False
 
             # Délai aléatoire
-            await self.execute_random_delay(2, 15)
+            await self.execute_random_delay(2, 20)
 
             logger.info("Récupération des tweets pour engagement...")
             tweets = await fetch_tweets("timeline", "", limit=20)
@@ -326,14 +333,17 @@ class AdvancedTwitterBot:
                 tweet_text = tweet.get('text', '').strip().lower()
                 tweet_author = tweet.get('author', '')
 
-                # AI/Tech relevance check
-                ai_tech_keywords = [
-                    'ai', 'artificial intelligence', 'machine learning', 'ml', 'tech', 'technology',
-                    'programming', 'coding', 'software', 'developer', 'innovation', 'startup',
-                    'data science', 'python', 'automation', 'future', 'digital'
+                # Cultural/Intellectual relevance check
+                cultural_keywords = [
+                    'philosophy', 'existentialism', 'stoicism', 'nietzsche', 'kant', 'plato', 'camus',
+                    'cinema', 'film', 'movie', 'kubrick', 'tarkovsky', 'scorsese', 'lynch', 'nolan',
+                    'music', 'album', 'radiohead', 'pink floyd', 'björk', 'kendrick', 'soundtrack',
+                    'book', 'novel', 'murakami', 'dostoevsky', 'orwell', 'kafka', 'poetry', 'literature',
+                    'consciousness', 'free will', 'meaning', 'existence', 'intellectual', 'thought',
+                    'cinephile', 'booklover', 'reflection', 'life meaning', 'recommendation'
                 ]
                 
-                has_relevant_content = any(keyword in tweet_text for keyword in ai_tech_keywords)
+                has_relevant_content = any(keyword in tweet_text for keyword in cultural_keywords)
                 
                 # Quality indicators
                 is_substantial = len(tweet_text) > 30
@@ -473,8 +483,15 @@ class AdvancedTwitterBot:
 
             # Enregistrer l'engagement même si partiellement réussi
             if engagement_successful:
-                # self.scheduler.record_engagement() #modified
                 logger.info(f"✅ Engagement terminé avec succès: {replies_posted} réponses, {quotes_posted} citations")
+                
+                # Vérifier si on a atteint les limites quotidiennes
+                current_reply_count = self.scheduler.state.get("daily_reply_count", 0)
+                current_quote_count = self.scheduler.state.get("daily_quote_count", 0)
+                
+                if current_reply_count >= 20 and current_quote_count >= 5:
+                    logger.info("🎯 Limites quotidiennes d'engagement atteintes - arrêt des engagements pour aujourd'hui")
+                
                 return True
             else:
                 logger.warning("❌ Aucun engagement réussi")
@@ -543,7 +560,26 @@ def main():
                 if actions_performed:
                     logger.info(f"✅ Actions effectuées: {', '.join(actions_performed)}")
                 else:
-                    logger.info("ℹ️  Aucune action nécessaire pour le moment")
+                    # Log current state for debugging
+                    thread_count = bot.scheduler.state.get("daily_thread_count", 0)
+                    reply_count = bot.scheduler.state.get("daily_reply_count", 0)
+                    quote_count = bot.scheduler.state.get("daily_quote_count", 0)
+                    tweet_count = bot.scheduler.state.get("daily_tweet_count", 0)
+                    
+                    logger.info(f"ℹ️  Aucune action nécessaire - État actuel:")
+                    logger.info(f"   Threads: {thread_count}/2, Tweets: {tweet_count}/10")
+                    logger.info(f"   Replies: {reply_count}/20, Quotes: {quote_count}/5")
+                    
+                    # Check last action times
+                    if bot.scheduler.state.get("last_thread_time"):
+                        last_thread = datetime.fromisoformat(bot.scheduler.state["last_thread_time"])
+                        hours_since_thread = (current_time_utc - last_thread.replace(tzinfo=timezone.utc)).total_seconds() / 3600
+                        logger.info(f"   Dernier thread: {hours_since_thread:.1f}h ago")
+                    
+                    if bot.scheduler.state.get("last_engagement_times"):
+                        last_engagement = datetime.fromisoformat(bot.scheduler.state["last_engagement_times"][-1])
+                        minutes_since_engagement = (current_time_utc - last_engagement.replace(tzinfo=timezone.utc)).total_seconds() / 60
+                        logger.info(f"   Dernier engagement: {minutes_since_engagement:.1f}min ago")
 
             elif args.action == 'standalone':
                 logger.info("Mode manuel: Tweet autonome")
