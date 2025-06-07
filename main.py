@@ -334,13 +334,16 @@ class AdvancedTwitterBot:
                 tweet_author = tweet.get('author', '')
 
                 # Cultural/Intellectual relevance check
-                cultural_keywords = [
-                    'philosophy', 'existentialism', 'stoicism', 'nietzsche', 'kant', 'plato', 'camus',
-                    'cinema', 'film', 'movie', 'kubrick', 'tarkovsky', 'scorsese', 'lynch', 'nolan',
-                    'music', 'album', 'radiohead', 'pink floyd', 'björk', 'kendrick', 'soundtrack',
-                    'book', 'novel', 'murakami', 'dostoevsky', 'orwell', 'kafka', 'poetry', 'literature',
-                    'consciousness', 'free will', 'meaning', 'existence', 'intellectual', 'thought',
-                    'cinephile', 'booklover', 'reflection', 'life meaning', 'recommendation'
+                cultural_keywords = [    'ai', 'artificial intelligence', 'machine learning', 'deep learning', 'neural networks',
+                     'language models', 'chatbot', 'gpt', 'llm', 'transformer model', 'openai', 'stablediffusion',
+                     'consciousness', 'sentience', 'alignment', 'ai ethics', 'bias', 'safety', 'interpretability',
+                     'singularity', 'superintelligence', 'automation', 'data', 'training', 'prompt', 'tokens',
+                     'self-awareness', 'reasoning', 'symbolic ai', 'agI', 'artificial general intelligence',
+                     'turing test', 'alan turing', 'computation', 'cybernetics', 'philosophy of mind',
+                     'existential risk', 'techno-optimism', 'posthuman', 'digital soul', 'neuro-symbolic',
+                     'simulation theory', 'recursive self-improvement', 'future of ai', 'ai alignment',
+                     'embodiment', 'cognitive architecture', 'human-like', 'digital consciousness',
+                     'mind upload', 'ai-generated', 'algorithm', 'computational creativity', 'ai personality'
                 ]
                 
                 has_relevant_content = any(keyword in tweet_text for keyword in cultural_keywords)
@@ -596,11 +599,11 @@ def main():
         
         # Predict what actions are possible
         logger.info(f"🎯 Actions prédites:")
-        can_thread = bot.scheduler.should_post_thread()
+        can_thread = False  # THREADS DISABLED
         can_tweet = bot.scheduler.should_post_tweet()
         can_engage = bot.scheduler.should_engage()
         
-        logger.info(f"   • Thread: {'✅ Possible' if can_thread else '❌ Bloqué'}")
+        logger.info(f"   • Thread: ❌ Désactivé")
         logger.info(f"   • Tweet: {'✅ Possible' if can_tweet else '❌ Bloqué'}")
         logger.info(f"   • Engagement: {'✅ Possible' if can_engage else '❌ Bloqué'}")
         
@@ -609,7 +612,7 @@ def main():
             logger.info("🚨 MODE FORCE ACTIVÉ - Ignorer les conditions temporelles")
         
         # Early exit if nothing to do and not forced
-        if not args.force and not (can_thread or can_tweet or can_engage):
+        if not args.force and not (can_tweet or can_engage):  # Removed can_thread
             logger.info("🛑 Aucune action possible selon les conditions actuelles")
             logger.info("💡 Utilisez --force pour outrepasser les conditions temporelles")
             return
@@ -625,20 +628,8 @@ def main():
                 actions_performed = []
                 actions_skipped = []
 
-                # Vérifier les threads en premier (priorité)
-                if bot.scheduler.should_post_thread() or args.force:
-                    if args.force and not bot.scheduler.should_post_thread():
-                        logger.info("🚨 FORCE: Posting thread malgré les conditions")
-                    else:
-                        logger.info("✅ Conditions remplies pour un thread")
-                    
-                    result = await bot.post_daily_thread(args.topic)
-                    if result:
-                        actions_performed.append(f"Thread posté ({len(result)} tweets)")
-                    else:
-                        actions_skipped.append("Thread (échec)")
-                else:
-                    actions_skipped.append("Thread (conditions non remplies)")
+                # THREADS DISABLED - Skip thread posting
+                actions_skipped.append("Thread (fonctionnalité désactivée)")
 
                 # Vérifier l'engagement
                 if bot.scheduler.should_engage() or args.force:
@@ -689,12 +680,9 @@ def main():
                     logger.error("❌ Échec du tweet autonome")
 
             elif args.action == 'thread':
-                logger.info("🧵 Mode manuel: Thread")
-                result = await bot.post_daily_thread(args.topic)
-                if result:
-                    logger.info(f"✅ Thread posté: {result}")
-                else:
-                    logger.error("❌ Échec du thread")
+                logger.info("🧵 Mode manuel: Thread (DÉSACTIVÉ)")
+                logger.warning("❌ La fonctionnalité thread est désactivée")
+                return
 
             elif args.action == 'engage':
                 logger.info("💬 Mode manuel: Engagement")
@@ -705,11 +693,12 @@ def main():
                     logger.error("❌ Échec de l'engagement")
 
             elif args.action == 'test':
-                logger.info("🧪 Mode test - exécution de toutes les fonctions...")
+                logger.info("🧪 Mode test - exécution des fonctions disponibles...")
                 await bot.post_standalone_tweet("Test - Sujet IA")
                 await asyncio.sleep(10)
                 engagement_result = await bot.scheduled_engagement()
                 logger.info(f"Test terminé - Engagement: {engagement_result}")
+                logger.info("Note: Threads sont désactivés pour ce test")
 
         asyncio.run(run_bot())
 
