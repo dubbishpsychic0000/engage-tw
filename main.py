@@ -505,7 +505,7 @@ class AdvancedTwitterBot:
 
 
 def main():
-    """Fonction principale avec gestion intelligente des actions - VERSION CORRIGÉE"""
+    """Fonction principale avec gestion intelligente des actions et vérification d'état précoce"""
     parser = argparse.ArgumentParser(description='Bot Twitter Avancé')
     parser.add_argument('action', nargs='?', default='auto',
                        choices=['auto', 'standalone', 'thread', 'engage', 'test'],
@@ -521,68 +521,167 @@ def main():
         current_time_utc = datetime.now(timezone.utc)
         logger.info(f"Démarrage du bot Twitter avancé... (Heure UTC: {current_time_utc.strftime('%Y-%m-%d %H:%M:%S')})")
 
+        # Initialize bot and immediately check state
         bot = AdvancedTwitterBot()
+        
+        # EARLY STATE CHECK - Log current state immediately after initialization
+        logger.info("=== VÉRIFICATION D'ÉTAT PRÉCOCE ===")
+        state = bot.scheduler.state
+        current_date = current_time_utc.date().isoformat()
+        
+        # Check if daily reset is needed
+        if state.get("last_reset_date") != current_date:
+            logger.info(f"🔄 Reset quotidien nécessaire (dernier reset: {state.get('last_reset_date', 'jamais')})")
+        else:
+            logger.info(f"✅ État à jour pour la date: {current_date}")
+        
+        # Log current counters
+        thread_count = state.get("daily_thread_count", 0)
+        tweet_count = state.get("daily_tweet_count", 0)
+        reply_count = state.get("daily_reply_count", 0)
+        quote_count = state.get("daily_quote_count", 0)
+        total_engagement = state.get("daily_engagement_count", 0)
+        
+        logger.info(f"📊 Compteurs actuels:")
+        logger.info(f"   • Threads: {thread_count}/2")
+        logger.info(f"   • Tweets: {tweet_count}/10")
+        logger.info(f"   • Réponses: {reply_count}/20")
+        logger.info(f"   • Citations: {quote_count}/5")
+        logger.info(f"   • Engagement total: {total_engagement}")
+        
+        # Check timing constraints
+        logger.info(f"⏰ Vérifications temporelles:")
+        
+        # Thread timing
+        if state.get("last_thread_time"):
+            try:
+                last_thread = datetime.fromisoformat(state["last_thread_time"])
+                if not last_thread.tzinfo:
+                    last_thread = last_thread.replace(tzinfo=timezone.utc)
+                hours_since_thread = (current_time_utc - last_thread).total_seconds() / 3600
+                thread_available = hours_since_thread >= 6
+                logger.info(f"   • Dernier thread: {hours_since_thread:.1f}h ago {'✅' if thread_available else '❌ (min 6h)'}")
+            except Exception as e:
+                logger.warning(f"   • Erreur lecture dernier thread: {e}")
+        else:
+            logger.info("   • Aucun thread précédent ✅")
+        
+        # Tweet timing
+        if state.get("last_tweet_times") and len(state["last_tweet_times"]) > 0:
+            try:
+                last_tweet = datetime.fromisoformat(state["last_tweet_times"][-1])
+                if not last_tweet.tzinfo:
+                    last_tweet = last_tweet.replace(tzinfo=timezone.utc)
+                hours_since_tweet = (current_time_utc - last_tweet).total_seconds() / 3600
+                tweet_available = hours_since_tweet >= 2
+                logger.info(f"   • Dernier tweet: {hours_since_tweet:.1f}h ago {'✅' if tweet_available else '❌ (min 2h)'}")
+            except Exception as e:
+                logger.warning(f"   • Erreur lecture dernier tweet: {e}")
+        else:
+            logger.info("   • Aucun tweet précédent ✅")
+        
+        # Engagement timing
+        if state.get("last_engagement_times") and len(state["last_engagement_times"]) > 0:
+            try:
+                last_engagement = datetime.fromisoformat(state["last_engagement_times"][-1])
+                if not last_engagement.tzinfo:
+                    last_engagement = last_engagement.replace(tzinfo=timezone.utc)
+                minutes_since_engagement = (current_time_utc - last_engagement).total_seconds() / 60
+                engagement_available = minutes_since_engagement >= 30
+                logger.info(f"   • Dernier engagement: {minutes_since_engagement:.1f}min ago {'✅' if engagement_available else '❌ (min 30min)'}")
+            except Exception as e:
+                logger.warning(f"   • Erreur lecture dernier engagement: {e}")
+        else:
+            logger.info("   • Aucun engagement précédent ✅")
+        
+        # Predict what actions are possible
+        logger.info(f"🎯 Actions prédites:")
+        can_thread = bot.scheduler.should_post_thread()
+        can_tweet = bot.scheduler.should_post_tweet()
+        can_engage = bot.scheduler.should_engage()
+        
+        logger.info(f"   • Thread: {'✅ Possible' if can_thread else '❌ Bloqué'}")
+        logger.info(f"   • Tweet: {'✅ Possible' if can_tweet else '❌ Bloqué'}")
+        logger.info(f"   • Engagement: {'✅ Possible' if can_engage else '❌ Bloqué'}")
+        
+        # Show force override status
+        if args.force:
+            logger.info("🚨 MODE FORCE ACTIVÉ - Ignorer les conditions temporelles")
+        
+        # Early exit if nothing to do and not forced
+        if not args.force and not (can_thread or can_tweet or can_engage):
+            logger.info("🛑 Aucune action possible selon les conditions actuelles")
+            logger.info("💡 Utilisez --force pour outrepasser les conditions temporelles")
+            return
+        
+        logger.info("=== FIN VÉRIFICATION D'ÉTAT ===")
+        logger.info("")
 
         async def run_bot():
             if args.action == 'auto':
                 # Mode automatique - détermine quoi faire basé sur l'heure et l'état
-                logger.info("Mode automatique - analyse des conditions...")
+                logger.info("🤖 Mode automatique - analyse des conditions...")
 
                 actions_performed = []
+                actions_skipped = []
 
                 # Vérifier les threads en premier (priorité)
-                if bot.scheduler.should_post_thread() or (args.force and 'thread' not in args.action):
-                    logger.info("Conditions remplies pour un thread")
+                if bot.scheduler.should_post_thread() or args.force:
+                    if args.force and not bot.scheduler.should_post_thread():
+                        logger.info("🚨 FORCE: Posting thread malgré les conditions")
+                    else:
+                        logger.info("✅ Conditions remplies pour un thread")
+                    
                     result = await bot.post_daily_thread(args.topic)
                     if result:
                         actions_performed.append(f"Thread posté ({len(result)} tweets)")
                     else:
-                        logger.warning("Échec du thread")
+                        actions_skipped.append("Thread (échec)")
+                else:
+                    actions_skipped.append("Thread (conditions non remplies)")
 
                 # Vérifier l'engagement
-                if bot.scheduler.should_engage() or (args.force and 'engage' not in args.action):
-                    logger.info("Conditions remplies pour l'engagement")
+                if bot.scheduler.should_engage() or args.force:
+                    if args.force and not bot.scheduler.should_engage():
+                        logger.info("🚨 FORCE: Engagement malgré les conditions")
+                    else:
+                        logger.info("✅ Conditions remplies pour l'engagement")
+                    
                     result = await bot.scheduled_engagement()
                     if result:
                         actions_performed.append("Engagement effectué")
                     else:
-                        logger.warning("Échec de l'engagement")
+                        actions_skipped.append("Engagement (échec)")
+                else:
+                    actions_skipped.append("Engagement (conditions non remplies)")
 
                 # Vérifier les tweets autonomes
-                if bot.scheduler.should_post_tweet() or (args.force and 'standalone' not in args.action):
-                    logger.info("Conditions remplies pour un tweet autonome")
+                if bot.scheduler.should_post_tweet() or args.force:
+                    if args.force and not bot.scheduler.should_post_tweet():
+                        logger.info("🚨 FORCE: Tweet autonome malgré les conditions")
+                    else:
+                        logger.info("✅ Conditions remplies pour un tweet autonome")
+                    
                     result = await bot.post_standalone_tweet(args.topic)
                     if result:
                         actions_performed.append("Tweet autonome posté")
                     else:
-                        logger.warning("Échec du tweet autonome")
-
-                if actions_performed:
-                    logger.info(f"✅ Actions effectuées: {', '.join(actions_performed)}")
+                        actions_skipped.append("Tweet autonome (échec)")
                 else:
-                    # Log current state for debugging
-                    thread_count = bot.scheduler.state.get("daily_thread_count", 0)
-                    reply_count = bot.scheduler.state.get("daily_reply_count", 0)
-                    quote_count = bot.scheduler.state.get("daily_quote_count", 0)
-                    tweet_count = bot.scheduler.state.get("daily_tweet_count", 0)
-                    
-                    logger.info(f"ℹ️  Aucune action nécessaire - État actuel:")
-                    logger.info(f"   Threads: {thread_count}/2, Tweets: {tweet_count}/10")
-                    logger.info(f"   Replies: {reply_count}/20, Quotes: {quote_count}/5")
-                    
-                    # Check last action times
-                    if bot.scheduler.state.get("last_thread_time"):
-                        last_thread = datetime.fromisoformat(bot.scheduler.state["last_thread_time"])
-                        hours_since_thread = (current_time_utc - last_thread.replace(tzinfo=timezone.utc)).total_seconds() / 3600
-                        logger.info(f"   Dernier thread: {hours_since_thread:.1f}h ago")
-                    
-                    if bot.scheduler.state.get("last_engagement_times"):
-                        last_engagement = datetime.fromisoformat(bot.scheduler.state["last_engagement_times"][-1])
-                        minutes_since_engagement = (current_time_utc - last_engagement.replace(tzinfo=timezone.utc)).total_seconds() / 60
-                        logger.info(f"   Dernier engagement: {minutes_since_engagement:.1f}min ago")
+                    actions_skipped.append("Tweet autonome (conditions non remplies)")
+
+                # Résumé final
+                logger.info("=== RÉSUMÉ DE L'EXÉCUTION ===")
+                if actions_performed:
+                    logger.info(f"✅ Actions réussies: {', '.join(actions_performed)}")
+                if actions_skipped:
+                    logger.info(f"⏭️  Actions ignorées: {', '.join(actions_skipped)}")
+                
+                if not actions_performed and not actions_skipped:
+                    logger.info("ℹ️  Aucune action déterminée")
 
             elif args.action == 'standalone':
-                logger.info("Mode manuel: Tweet autonome")
+                logger.info("📝 Mode manuel: Tweet autonome")
                 result = await bot.post_standalone_tweet(args.topic)
                 if result:
                     logger.info(f"✅ Tweet autonome posté: {result}")
@@ -590,7 +689,7 @@ def main():
                     logger.error("❌ Échec du tweet autonome")
 
             elif args.action == 'thread':
-                logger.info("Mode manuel: Thread")
+                logger.info("🧵 Mode manuel: Thread")
                 result = await bot.post_daily_thread(args.topic)
                 if result:
                     logger.info(f"✅ Thread posté: {result}")
@@ -598,7 +697,7 @@ def main():
                     logger.error("❌ Échec du thread")
 
             elif args.action == 'engage':
-                logger.info("Mode manuel: Engagement")
+                logger.info("💬 Mode manuel: Engagement")
                 result = await bot.scheduled_engagement()
                 if result:
                     logger.info("✅ Engagement effectué avec succès")
@@ -606,7 +705,7 @@ def main():
                     logger.error("❌ Échec de l'engagement")
 
             elif args.action == 'test':
-                logger.info("Mode test - exécution de toutes les fonctions...")
+                logger.info("🧪 Mode test - exécution de toutes les fonctions...")
                 await bot.post_standalone_tweet("Test - Sujet IA")
                 await asyncio.sleep(10)
                 engagement_result = await bot.scheduled_engagement()
@@ -615,9 +714,9 @@ def main():
         asyncio.run(run_bot())
 
     except KeyboardInterrupt:
-        logger.info("Bot arrêté par l'utilisateur")
+        logger.info("⏹️  Bot arrêté par l'utilisateur")
     except Exception as e:
-        logger.error(f"Erreur fatale: {e}")
+        logger.error(f"💥 Erreur fatale: {e}")
         import traceback
         logger.error(f"Traceback complet: {traceback.format_exc()}")
         exit(1)
