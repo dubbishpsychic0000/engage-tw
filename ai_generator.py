@@ -29,7 +29,55 @@ class AIGenerator:
             logger.error(f"AI generation failed: {e}")
             return None
     
-    async def generate_reply(self, original_tweet: str, context: str = "") -> Optional[str]:
+    async def generate_suggestion(self, original_tweet: str, context: str = "") -> Optional[str]:
+        """Generate a reply to a tweet"""
+        prompt = f"""You're a helpful and friendly AI replying to a tweet. Based on the tweet content, identify if any of the following product categories are mentioned or implied:
+
+Stanley Quencher H2.0 FlowState Tumbler
+— Keywords: water bottle, tumbler, hydration
+— Link: https://amzn.to/478RVlK
+
+Amazon Fire TV Stick 4K
+— Keywords: streaming stick, Fire TV, 4K stick
+— Link: https://amzn.to/45ecydU
+
+TOZO T6 Wireless Earbuds
+— Keywords: earbuds, wireless earbuds, bluetooth earbuds
+— Link: https://amzn.to/45cmR1V
+
+Mighty Patch Acne Patch
+— Keywords: pimple patch, acne patch, Mighty Patch
+— Link: https://amzn.to/4ml7LhB
+
+Owala FreeSip Water Bottle
+— Keywords: insulated bottle, water bottle, Owala bottle
+— Link: https://amzn.to/4mj1jrh
+
+If the tweet aligns with any of the product keywords, write a friendly and casual reply suggesting the compatible product, as if you're recommending it from personal experience or just being helpful. Keep the tone warm, human-like, and never pushy. Always include the correct Amazon link at the end. Max 1–2 sentences.
+
+ Keep it under {MAX_TWEET_LENGTH} characters.
+
+Original tweet: "{original_tweet}"
+
+Context: {context}
+
+Reply should be:
+- Relevant and engaging
+- Professional but conversational
+- Under {MAX_TWEET_LENGTH} characters
+- Not controversial or offensive
+
+Reply:"""
+        
+        reply = await self.generate_content(prompt)
+        if reply and len(reply) <= MAX_TWEET_LENGTH:
+            logger.info(f"Generated reply: {reply[:50]}...")
+            return reply
+        elif reply:
+            return reply[:MAX_TWEET_LENGTH-3] + "..."
+        return None
+
+        async def generate_reply(self, original_tweet: str, context: str = "") -> Optional[str]:
         """Generate a reply to a tweet"""
         prompt = f"""you are a twitterbot posting about ai Generate a thoughtful, engaging reply to this tweet. Keep it under {MAX_TWEET_LENGTH} characters.
 
@@ -52,7 +100,6 @@ Reply:"""
         elif reply:
             return reply[:MAX_TWEET_LENGTH-3] + "..."
         return None
-    
     async def generate_quote_tweet(self, original_tweet: str, context: str = "") -> Optional[str]:
         """Generate a quote tweet"""
         prompt = f"""you are a twitter bot that post about AI Generate a quote tweet comment for this tweet. Keep it under {MAX_TWEET_LENGTH-50} characters (to leave room for the quoted tweet).
