@@ -1,0 +1,103 @@
+[
+  {
+    "name": "Formation Python Complète 2024",
+    "description": "Cours complet Python de débutant à expert avec projets pratiques et certificat",
+    "affiliate_link": "https://example.com/python-masterclass?ref=twitterbot&utm_source=twitter",
+    "category": "programming",
+    "keywords": [
+      "python", "programming", "coding", "learn python", "development", 
+      "developer", "beginner programming", "python tutorial", "coding course"
+    ],
+    "price_range": "79-149€",
+    "success_count": 0,
+    "view_count": 0
+  },
+  {
+    "name": "Pack Design Graphique Pro",
+    "description": "Collection complète de templates, fonts et outils pour designers professionnels",
+    "affiliate_link": "https://example.com/design-pro-pack?ref=twitterbot&utm_source=twitter",
+    "category": "design",
+    "keywords": [
+      "design", "graphic design", "photoshop", "illustrator", "creative", 
+      "logo design", "branding", "visual design", "design templates"
+    ],
+    "price_range": "49-99€",
+    "success_count": 0,
+    "view_count": 0
+  },
+  {
+    "name": "Guide Marketing Digital 2024",
+    "description": "Stratégies complètes pour réussir en marketing digital, SEO, et réseaux sociaux",
+    "affiliate_link": "https://example.com/digital-marketing-guide?ref=twitterbot&utm_source=twitter",
+    "category": "marketing",
+    "keywords": [
+      "marketing", "digital marketing", "social media marketing", "seo", 
+      "advertising", "business growth", "online marketing", "content marketing"
+    ],
+    "price_range": "59-129€",
+    "success_count": 0,
+    "view_count": 0
+  },
+  {
+    "name": "Ebook Productivité & Time Management",
+    "description": "Méthodes éprouvées pour doubler votre productivité et maîtriser votre temps",
+    "affiliate_link": "https://example.com/productivity-mastery?ref=twitterbot&utm_source=twitter",
+    "category": "productivity",
+    "keywords": [
+      "productivity", "time management", "efficiency", "organization", 
+      "workflow", "getting things done", "focus", "work life balance"
+    ],
+    "price_range": "19-39€",
+    "success_count": 0,
+    "view_count": 0
+  },
+  {
+    "name": "Formation IA & Machine Learning",
+    "description": "Apprenez l'IA et le ML avec des projets pratiques. De débutant à expert.",
+    "affiliate_link": "https://example.com/ai-ml-course?ref=twitterbot&utm_source=twitter",
+    "category": "ai",
+    "keywords": [
+      "ai", "artificial intelligence", "machine learning", "deep learning", 
+      "data science", "neural networks", "ai course", "ml tutorial"
+    ],
+    "price_range": "99-249€",
+    "success_count": 0,
+    "view_count": 0
+  },
+  {
+    "name": "Toolkit Entrepreneur Digital",
+    "description": "Tous les outils et ressources pour lancer votre business en ligne",
+    "affiliate_link": "https://example.com/entrepreneur-toolkit?ref=twitterbot&utm_source=twitter",
+    "category": "business",
+    "keywords": [
+      "entrepreneur", "startup", "business", "online business", 
+      "side hustle", "passive income", "digital nomad", "freelance"
+    ],
+    "price_range": "39-89€",
+    "success_count": 0,
+    "view_count": 0
+  },
+  {
+    "name": "Cours Photographie Mobile",
+    "description": "Créez des photos professionnelles avec votre smartphone. Techniques et editing.",
+    "affiliate_link": "https://example.com/mobile-photography?ref=twitterbot&utm_source=twitter",
+    "category": "photography",
+    "keywords": [
+      "photography", "mobile photography", "instagram", "photo editing", 
+      "smartphone photos", "visual content", "social media photos"
+    ],
+    "price_range": "29-69€",
+    "success_count": 0,
+    "view_count": 0
+  },
+  {
+    "name": "Guide Crypto & Blockchain",
+    "description": "Comprendre et investir dans les cryptomonnaies en toute sécurité",
+    "affiliate_link": "https://example.com/crypto-guide?ref=twitterbot&utm_source=twitter",
+    "category": "crypto",
+    "keywords": [
+      "crypto", "cryptocurrency", "bitcoin", "blockchain", "ethereum", 
+      "defi", "nft", "crypto trading", "crypto investment"
+    ],
+    "price_range": "49-119€",
+    "success_count": 0,
