@@ -101,3 +101,32 @@
     ],
     "price_range": "49-119€",
     "success_count": 0,
+    "view_count": 0
+  },
+  {
+    "name": "Formation Copywriting Persuasif",
+    "description": "Maîtrisez l'art d'écrire pour vendre et convaincre avec vos mots",
+    "affiliate_link": "https://example.com/copywriting-course?ref=twitterbot&utm_source=twitter",
+    "category": "copywriting",
+    "keywords": [
+      "copywriting", "writing", "sales copy", "persuasive writing", 
+      "content writing", "email marketing", "conversion", "sales writing"
+    ],
+    "price_range": "69-149€",
+    "success_count": 0,
+    "view_count": 0
+  },
+  {
+    "name": "Masterclass Fitness à Domicile",
+    "description": "Programme complet d'entraînement sans matériel pour tous niveaux",
+    "affiliate_link": "https://example.com/home-fitness?ref=twitterbot&utm_source=twitter",
+    "category": "fitness",
+    "keywords": [
+      "fitness", "workout", "home workout", "exercise", "health", 
+      "bodyweight training", "muscle building", "weight loss", "stay fit"
+    ],
+    "price_range": "39-79€",
+    "success_count": 0,
+    "view_count": 0
+  }
+]
