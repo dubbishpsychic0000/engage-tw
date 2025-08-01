@@ -77,7 +77,7 @@ Reply:"""
             return reply[:MAX_TWEET_LENGTH-3] + "..."
         return None
 
-        async def generate_reply(self, original_tweet: str, context: str = "") -> Optional[str]:
+    async def generate_reply(self, original_tweet: str, context: str = "") -> Optional[str]:
         """Generate a reply to a tweet"""
         prompt = f"""you are a twitterbot posting about ai Generate a thoughtful, engaging reply to this tweet. Keep it under {MAX_TWEET_LENGTH} characters.
 
