@@ -11,6 +11,7 @@ from config import logger, validate_config
 from ai_generator import generate_ai_content
 from poster import post_content
 from twscrape_client import fetch_tweets
+from affiliate_marketing import run_affiliate_marketing, AffiliateMarketingBot
 
 class PersistentScheduler:
     """Gestionnaire d'état persistant pour le timing du bot"""
@@ -37,8 +38,10 @@ class PersistentScheduler:
             "last_reset_date": datetime.now(timezone.utc).isoformat()[:10],
             "daily_engagement_count": 0,
             "last_engagement_date": None,
-            "daily_reply_count": 0,  # Ajout du compteur quotidien de réponses
-            "daily_quote_count": 0,  # Ajout du compteur quotidien de citations
+            "daily_reply_count": 0,
+            "daily_quote_count": 0,
+            "daily_affiliate_count": 0,  # Nouveau: compteur d'affiliation
+            "last_affiliate_time": None,  # Nouveau: dernière activité d'affiliation
         }
 
     def _save_state(self):
@@ -64,8 +67,9 @@ class PersistentScheduler:
             self.state["last_tweet_times"] = []
             self.state["last_reset_date"] = current_date
             self.state["daily_engagement_count"] = 0
-            self.state["daily_reply_count"] = 0  # Réinitialiser le compteur quotidien de réponses
-            self.state["daily_quote_count"] = 0  # Réinitialiser le compteur quotidien de citations
+            self.state["daily_reply_count"] = 0
+            self.state["daily_quote_count"] = 0
+            self.state["daily_affiliate_count"] = 0  # Reset affiliation
             logger.info("Reset quotidien effectué")
 
         # Original tweets: Limit of 10 tweets per day
@@ -87,6 +91,37 @@ class PersistentScheduler:
 
         return True
 
+    def should_run_affiliate(self) -> bool:
+        """Détermine s'il faut exécuter l'affiliation"""
+        current_time = self._get_current_utc_time()
+        current_date = current_time.date().isoformat()
+
+        # Reset quotidien
+        if self.state["last_reset_date"] != current_date:
+            self.state["daily_affiliate_count"] = 0
+            self.state["last_affiliate_time"] = None
+            self._save_state()
+
+        # Limite quotidienne d'affiliation (plus conservative)
+        if self.state["daily_affiliate_count"] >= 8:
+            logger.info(f"Limite quotidienne d'affiliation atteinte ({self.state['daily_affiliate_count']}/8)")
+            return False
+
+        # Espacement minimum entre les sessions d'affiliation (1 heure)
+        if self.state.get("last_affiliate_time"):
+            try:
+                last_affiliate = datetime.fromisoformat(self.state["last_affiliate_time"])
+                if not last_affiliate.tzinfo:
+                    last_affiliate = last_affiliate.replace(tzinfo=timezone.utc)
+                if current_time - last_affiliate < timedelta(hours=1):
+                    remaining_minutes = (timedelta(hours=1) - (current_time - last_affiliate)).total_seconds() / 60
+                    logger.info(f"Espacement minimum non respecté pour l'affiliation (encore {remaining_minutes:.1f} minutes)")
+                    return False
+            except Exception as e:
+                logger.warning(f"Erreur lors de la vérification de la dernière affiliation: {e}")
+
+        return True
+
     def should_post_thread(self) -> bool:
         """Détermine s'il faut poster un thread (2 fois par jour avec espacement minimum)"""
         current_time = self._get_current_utc_time()
@@ -102,6 +137,7 @@ class PersistentScheduler:
             self.state["daily_quote_count"] = 0
             self.state["daily_thread_count"] = 0
             self.state["last_thread_time"] = None
+            self.state["daily_affiliate_count"] = 0
             self._save_state()
             logger.info("Reset quotidien effectué")
 
@@ -206,6 +242,13 @@ class PersistentScheduler:
             f"Replies: {self.state.get('daily_reply_count', 0)}/20, "
             f"Quotes: {self.state.get('daily_quote_count', 0)}/5"
         )
+
+    def record_affiliate(self, count: int = 1):
+        """Enregistre une activité d'affiliation"""
+        self.state["last_affiliate_time"] = self._get_current_utc_time().isoformat()
+        self.state["daily_affiliate_count"] = self.state.get("daily_affiliate_count", 0) + count
+        self._save_state()
+        logger.info(f"Affiliation enregistrée ({self.state['daily_affiliate_count']}/8)")
 
 
 class AdvancedTwitterBot:
@@ -334,16 +377,13 @@ class AdvancedTwitterBot:
                 tweet_author = tweet.get('author', '')
 
                 # Cultural/Intellectual relevance check
-                cultural_keywords = [    'ai', 'artificial intelligence', 'machine learning', 'deep learning', 'neural networks',
-                     'language models', 'chatbot', 'gpt', 'llm', 'transformer model', 'openai', 'stablediffusion',
-                     'consciousness', 'sentience', 'alignment', 'ai ethics', 'bias', 'safety', 'interpretability',
-                     'singularity', 'superintelligence', 'automation', 'data', 'training', 'prompt', 'tokens',
-                     'self-awareness', 'reasoning', 'symbolic ai', 'agI', 'artificial general intelligence',
-                     'turing test', 'alan turing', 'computation', 'cybernetics', 'philosophy of mind',
-                     'existential risk', 'techno-optimism', 'posthuman', 'digital soul', 'neuro-symbolic',
-                     'simulation theory', 'recursive self-improvement', 'future of ai', 'ai alignment',
-                     'embodiment', 'cognitive architecture', 'human-like', 'digital consciousness',
-                     'mind upload', 'ai-generated', 'algorithm', 'computational creativity', 'ai personality'
+                cultural_keywords = [
+                    'philosophy', 'existentialism', 'stoicism', 'nietzsche', 'kant', 'plato', 'camus',
+                    'cinema', 'film', 'movie', 'kubrick', 'tarkovsky', 'scorsese', 'lynch', 'nolan',
+                    'music', 'album', 'radiohead', 'pink floyd', 'björk', 'kendrick', 'soundtrack',
+                    'book', 'novel', 'murakami', 'dostoevsky', 'orwell', 'kafka', 'poetry', 'literature',
+                    'consciousness', 'free will', 'meaning', 'existence', 'intellectual', 'thought',
+                    'cinephile', 'booklover', 'reflection', 'life meaning', 'recommendation'
                 ]
                 
                 has_relevant_content = any(keyword in tweet_text for keyword in cultural_keywords)
@@ -506,12 +546,40 @@ class AdvancedTwitterBot:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
+    async def run_affiliate_marketing(self) -> bool:
+        """Exécute le marketing d'affiliation"""
+        try:
+            if not self.scheduler.should_run_affiliate():
+                logger.info("Affiliation non nécessaire selon les conditions")
+                return False
+
+            logger.info("🛒 Démarrage du marketing d'affiliation...")
+            
+            # Délai aléatoire
+            await self.execute_random_delay(2, 15)
+            
+            # Exécuter l'affiliation
+            result = await run_affiliate_marketing()
+            
+            if result:
+                # Enregistrer l'activité d'affiliation
+                self.scheduler.record_affiliate()
+                logger.info("✅ Session d'affiliation terminée avec succès")
+                return True
+            else:
+                logger.info("ℹ️ Session d'affiliation terminée sans action")
+                return False
+
+        except Exception as e:
+            logger.error(f"Erreur dans run_affiliate_marketing: {e}")
+            return False
+
 
 def main():
-    """Fonction principale avec gestion intelligente des actions et vérification d'état précoce"""
-    parser = argparse.ArgumentParser(description='Bot Twitter Avancé')
+    """Fonction principale avec gestion intelligente des actions et support d'affiliation"""
+    parser = argparse.ArgumentParser(description='Bot Twitter Avancé avec Affiliate Marketing')
     parser.add_argument('action', nargs='?', default='auto',
-                       choices=['auto', 'standalone', 'thread', 'engage', 'test'],
+                       choices=['auto', 'standalone', 'thread', 'engage', 'affiliate', 'test', 'stats'],
                        help='Action à exécuter')
     parser.add_argument('--topic', help='Sujet spécifique pour le contenu')
     parser.add_argument('--force', action='store_true', 
@@ -522,7 +590,7 @@ def main():
     try:
         validate_config()
         current_time_utc = datetime.now(timezone.utc)
-        logger.info(f"Démarrage du bot Twitter avancé... (Heure UTC: {current_time_utc.strftime('%Y-%m-%d %H:%M:%S')})")
+        logger.info(f"Démarrage du bot Twitter avancé avec affiliation... (Heure UTC: {current_time_utc.strftime('%Y-%m-%d %H:%M:%S')})")
 
         # Initialize bot and immediately check state
         bot = AdvancedTwitterBot()
@@ -543,6 +611,7 @@ def main():
         tweet_count = state.get("daily_tweet_count", 0)
         reply_count = state.get("daily_reply_count", 0)
         quote_count = state.get("daily_quote_count", 0)
+        affiliate_count = state.get("daily_affiliate_count", 0)
         total_engagement = state.get("daily_engagement_count", 0)
         
         logger.info(f"📊 Compteurs actuels:")
@@ -550,6 +619,7 @@ def main():
         logger.info(f"   • Tweets: {tweet_count}/10")
         logger.info(f"   • Réponses: {reply_count}/20")
         logger.info(f"   • Citations: {quote_count}/5")
+        logger.info(f"   • Affiliation: {affiliate_count}/8")
         logger.info(f"   • Engagement total: {total_engagement}")
         
         # Check timing constraints
@@ -596,23 +666,39 @@ def main():
                 logger.warning(f"   • Erreur lecture dernier engagement: {e}")
         else:
             logger.info("   • Aucun engagement précédent ✅")
+
+        # Affiliate timing
+        if state.get("last_affiliate_time"):
+            try:
+                last_affiliate = datetime.fromisoformat(state["last_affiliate_time"])
+                if not last_affiliate.tzinfo:
+                    last_affiliate = last_affiliate.replace(tzinfo=timezone.utc)
+                hours_since_affiliate = (current_time_utc - last_affiliate).total_seconds() / 3600
+                affiliate_available = hours_since_affiliate >= 1
+                logger.info(f"   • Dernière affiliation: {hours_since_affiliate:.1f}h ago {'✅' if affiliate_available else '❌ (min 1h)'}")
+            except Exception as e:
+                logger.warning(f"   • Erreur lecture dernière affiliation: {e}")
+        else:
+            logger.info("   • Aucune affiliation précédente ✅")
         
         # Predict what actions are possible
         logger.info(f"🎯 Actions prédites:")
         can_thread = False  # THREADS DISABLED
         can_tweet = bot.scheduler.should_post_tweet()
         can_engage = bot.scheduler.should_engage()
+        can_affiliate = bot.scheduler.should_run_affiliate()
         
         logger.info(f"   • Thread: ❌ Désactivé")
         logger.info(f"   • Tweet: {'✅ Possible' if can_tweet else '❌ Bloqué'}")
         logger.info(f"   • Engagement: {'✅ Possible' if can_engage else '❌ Bloqué'}")
+        logger.info(f"   • Affiliation: {'✅ Possible' if can_affiliate else '❌ Bloqué'}")
         
         # Show force override status
         if args.force:
             logger.info("🚨 MODE FORCE ACTIVÉ - Ignorer les conditions temporelles")
         
         # Early exit if nothing to do and not forced
-        if not args.force and not (can_tweet or can_engage):  # Removed can_thread
+        if not args.force and not (can_tweet or can_engage or can_affiliate):
             logger.info("🛑 Aucune action possible selon les conditions actuelles")
             logger.info("💡 Utilisez --force pour outrepasser les conditions temporelles")
             return
@@ -630,6 +716,21 @@ def main():
 
                 # THREADS DISABLED - Skip thread posting
                 actions_skipped.append("Thread (fonctionnalité désactivée)")
+
+                # Vérifier l'affiliation en PREMIER (priorité pour la monétisation)
+                if bot.scheduler.should_run_affiliate() or args.force:
+                    if args.force and not bot.scheduler.should_run_affiliate():
+                        logger.info("🚨 FORCE: Affiliation malgré les conditions")
+                    else:
+                        logger.info("✅ Conditions remplies pour l'affiliation")
+                    
+                    result = await bot.run_affiliate_marketing()
+                    if result:
+                        actions_performed.append("Affiliation effectuée")
+                    else:
+                        actions_skipped.append("Affiliation (aucune opportunité)")
+                else:
+                    actions_skipped.append("Affiliation (conditions non remplies)")
 
                 # Vérifier l'engagement
                 if bot.scheduler.should_engage() or args.force:
@@ -692,12 +793,50 @@ def main():
                 else:
                     logger.error("❌ Échec de l'engagement")
 
+            elif args.action == 'affiliate':
+                logger.info("🛒 Mode manuel: Affiliate Marketing")
+                result = await bot.run_affiliate_marketing()
+                if result:
+                    logger.info("✅ Affiliation effectuée avec succès")
+                else:
+                    logger.info("ℹ️ Aucune opportunité d'affiliation trouvée")
+
+            elif args.action == 'stats':
+                logger.info("📊 Mode statistiques: Affichage des stats d'affiliation")
+                try:
+                    affiliate_bot = AffiliateMarketingBot()
+                    stats = affiliate_bot.get_statistics()
+                    
+                    logger.info("=== STATISTIQUES D'AFFILIATION ===")
+                    logger.info(f"📦 Produits configurés: {stats['total_products']}")
+                    logger.info(f"📊 Vues totales: {stats['total_views']}")
+                    logger.info(f"✅ Succès totaux: {stats['total_successes']}")
+                    logger.info(f"📈 Taux de conversion: {stats['conversion_rate']:.1f}%")
+                    logger.info(f"🗓️ Affiliation aujourd'hui: {stats['daily_affiliate_count']}/{stats['max_daily_affiliates']}")
+                    logger.info(f"🔄 Tweets traités: {stats['processed_tweets']}")
+                    logger.info("=====================================")
+                    
+                    # Afficher les produits les plus performants
+                    from affiliate_marketing import AffiliateProductManager
+                    pm = AffiliateProductManager()
+                    if pm.products:
+                        logger.info("🏆 TOP 3 PRODUITS:")
+                        sorted_products = sorted(pm.products, key=lambda p: p.success_count, reverse=True)
+                        for i, product in enumerate(sorted_products[:3], 1):
+                            conversion = (product.success_count / product.view_count * 100) if product.view_count > 0 else 0
+                            logger.info(f"   {i}. {product.name}: {product.success_count} succès, {conversion:.1f}% conversion")
+                    
+                except Exception as stats_error:
+                    logger.error(f"Erreur lors de l'affichage des statistiques: {stats_error}")
+
             elif args.action == 'test':
                 logger.info("🧪 Mode test - exécution des fonctions disponibles...")
                 await bot.post_standalone_tweet("Test - Sujet IA")
                 await asyncio.sleep(10)
                 engagement_result = await bot.scheduled_engagement()
-                logger.info(f"Test terminé - Engagement: {engagement_result}")
+                await asyncio.sleep(10)
+                affiliate_result = await bot.run_affiliate_marketing()
+                logger.info(f"Test terminé - Engagement: {engagement_result}, Affiliation: {affiliate_result}")
                 logger.info("Note: Threads sont désactivés pour ce test")
 
         asyncio.run(run_bot())
