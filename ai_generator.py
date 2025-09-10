@@ -79,8 +79,8 @@ Reply:"""
 
     async def generate_reply(self, original_tweet: str, context: str = "") -> Optional[str]:
         """Generate a reply to a tweet"""
-        prompt = f"""you are a twitterbot posting about ai Generate a thoughtful, engaging reply to this tweet. Keep it under {MAX_TWEET_LENGTH} characters.
-
+        prompt = f"""you are a twitterbot posting about ai Generate a thoughtful, engaging reply to this tweet. Keep it under {MAX_TWEET_LENGTH} characters.try to engage this book in the reply As a Man Thinketh by James Allen and this link to the audiobook http://bit.ly/4mYCRfK
+                    
 Original tweet: "{original_tweet}"
 
 Context: {context}
